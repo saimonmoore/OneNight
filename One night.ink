@@ -6,6 +6,157 @@ CROYDON, 2022
 Residence of the Moore family
 -> intro
 
+# FUNCTIONS
+
+// have the game react to content the player saw just now.
+// e.g. * {came_from(->  nice_welcome)} 'I'm happy to be here!'
+=== function came_from(-> x)
+  ~ return TURNS_SINCE(x) == 0
+
+// Helper function: Change variable to state directly
+=== function changeStateTo(ref stateVariable, stateToReach)
+  // remove all states of this type
+  ~ stateVariable -= LIST_ALL(stateToReach)
+  // put back the state we want
+  ~ stateVariable += stateToReach
+  
+// Helper function: popping elements from lists
+=== function pop(ref list)
+  ~ temp x = LIST_MIN(list) 
+  ~ list -= x 
+  ~ return x
+
+
+//
+//  System: items can have various states
+//  Some are general, some specific to particular items
+//
+
+LIST OffOn = off, on
+LIST SeenUnseen = unseen, seen
+
+//
+// System: inventory
+//
+
+LIST Inventory = (none), cane, knife
+
+// Add to invertory
+=== function get(x)
+  ~ Inventory += x
+
+//
+// System: positioning things
+// Items can be put in and on places
+//
+
+LIST Supporters = on_desk, on_floor, on_bed, under_bed, held, with_son
+
+=== function move_to_supporter(ref item_state, new_supporter) ===
+    ~ item_state -= LIST_ALL(Supporters)
+    ~ item_state += new_supporter
+
+// System: Incremental knowledge.
+// Each list is a chain of facts. Each fact supersedes the fact before 
+//
+
+VAR knowledgeState = ()
+
+=== function reached (x) 
+  ~ return knowledgeState ? x 
+
+=== function between(x, y) 
+  ~ return knowledgeState? x && not (knowledgeState ^ y)
+
+=== function reach(statesToSet) 
+  ~ temp x = pop(statesToSet)
+  {
+  - not x: 
+     ~ return false 
+
+  - not reached(x):
+     ~ temp chain = LIST_ALL(x)
+     ~ temp statesGained = LIST_RANGE(chain, LIST_MIN(chain), x)
+     ~ knowledgeState += statesGained
+     ~ reach (statesToSet) 	// set any other states left to set
+     ~ return true  	       // and we set this state, so true
+ 
+  - else:
+     ~ return false || reach(statesToSet) 
+  }	
+
+// System: Scoring
+
+VAR score = 100
+
+=== function reduceScore(n)
+  ~ score -= n
+  
+=== function increaseScore(n) 
+  ~ score += n
+  
+=== function showScore()
+{
+  - score == 100:
+	~ return "No points lost yet! Keep up the good work."
+  - score > 75 && score < 100:
+	~ return "No points lost yet! Keep up the good work."	
+  - score <= 75 && score > 50:
+	~ return "Still quite respectable."
+  - score <= 50 && score > 2:
+	~ return "Somewhat paltry..."
+  - score < 2 && score > 0:
+	~ return "Not looking good chum..."	
+- else:
+	~ return "Valhalla!"
+}
+
+=== function notifyReducedScore(points)
+(Note from author: <>
+{
+  - score == 100:
+	~ return "Hmmm...That last move of your was great! But you're doing so well, it had no last effect.)"
+  - score > 75 && score < 100:
+	~ return "With that, your score just went down by {points} points! But it hasn't really dented your overall progress. Keep up the good work!)"	
+  - score <= 75 && score > 50:
+	~ return "Oops. That made your score go down by {points}! You're till doing quite well though.)"
+  - score <= 50 && score > 2:
+	~ return "Yikes. Your score just dropped by {points}! The game has taken a turn for the worse. Depending on what you do next though, you can make up for this less than impressive decision.)"
+  - score < 2 && score > 0:
+	~ return "Deary deary me. What a very ill-conceived idea that was. You narrowly escaped a one-way ticket to the pearly gates this time but your fate is hanging by a thread. Your next moves will be crucial!)"	
+- else:
+	~ return "The pearly gates (if you believe in that kind of thing) open slowly before you. You stride over into the unkown, never to return. (Or for the atheists out there, 'You died'!)"
+}
+
+
+=== function reduceAndUpdateScore(points)
+  ~ reduceScore(points)
+  { notifyReducedScore(points) }
+
+//
+// Set up the game
+//
+
+VAR bedroomLightState = (off, on_desk)
+
+VAR remoteDownstairsState = (under_bed)
+VAR remoteUpstairsState = (on_desk, with_son)
+
+CONST TOP_SCORE = 100
+CONST ENDGAME_SCORE = 0
+
+//
+// Knowledge chains
+//
+
+LIST BedKnowledge = neatly_made, crumpled_duvet, hastily_remade, body_on_bed, murdered_in_bed, murdered_while_asleep
+
+LIST KnifeKnowledge = prints_on_knife, joe_seen_prints_on_knife,joe_wants_better_prints, joe_got_better_prints
+
+LIST WindowKnowledge = steam_on_glass, fingerprints_on_glass, fingerprints_on_glass_match_knife
+
+
+# ******************** STORY SECTION *********************
 === intro ===
 It was almost a sensation that pure evil had come to visit you at two thirty in the morning. # colour it blue
 -> going_to_bed
@@ -25,6 +176,7 @@ As you lowered your tired body onto your bed, a haunting sensation swept over yo
 
 === toying_with_phone ===
 About 20 seconds later, your eyelids flipped open and your right arm was already reaching for your fruity smart phone. After a bit of vertical finger swiping, you discovered a new IF writing engine called Ink which seemed a lot easier to get into than inform 7. However, after reading through the entire basic tutorial (a good 7 minutes of reading time) your eyes couldn't resist spacetime curvature any longer and they shut firmly for the duration of the evening. (Or that was their intention at least).
+    { reduceAndUpdateScore(5) }
   -> sleep_part1
 
 # Example of a weeve with a loop
